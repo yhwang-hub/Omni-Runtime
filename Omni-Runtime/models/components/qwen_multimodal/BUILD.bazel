@@ -1,0 +1,19 @@
+package(default_visibility = ["//Omni-Runtime/models:__subpackages__"])
+
+cc_library(
+    name = "processor",
+    srcs = ["processor.cc"],
+    hdrs = ["processor.h", "processor_define.h"],
+    deps = [
+        "//Omni-Runtime/gguf_serializer:gguf_serializer",
+        "//Omni-Runtime/inference:inference",
+        "//Omni-Runtime/inference/common/inference_define:inference_define",
+        "//Omni-Runtime/utils:utils",
+    ],
+)
+
+cc_test(
+    name = "processor_test",
+    srcs = ["processor_test.cc"],
+    deps = [":processor", "@googletest//:gtest_main"],
+)

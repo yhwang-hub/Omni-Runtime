@@ -1,0 +1,21 @@
+package(default_visibility = ["//visibility:public"])
+
+cc_library(
+    name = "compiler_core",
+    hdrs = glob(["**/*.h"]),
+    includes = [".."],
+    copts = ["-std=c++20"],
+    deps = ["//Omni-Runtime/utils:utils"],
+    linkopts = ["-ldl", "-lpthread"],
+)
+
+# Keep existing clients and test commands working after backend encapsulation.
+cc_library(
+    name = "kernel",
+    deps = [":compiler_core", "//Omni-Runtime/backend:jit_runtime"],
+)
+
+alias(
+    name = "opencl_jit_test",
+    actual = "//Omni-Runtime/backend:opencl_jit_test",
+)

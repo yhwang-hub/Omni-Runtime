@@ -1,0 +1,37 @@
+package(default_visibility = ["//visibility:public"])
+
+cc_library(
+    name = "model",
+    hdrs = ["model.h", "model_define.h"],
+)
+
+cc_library(
+    name = "registry",
+    srcs = ["registry.cc"],
+    hdrs = ["registry.h"],
+    copts = ["-std=c++20"],
+    deps = [
+        ":model",
+        "//Omni-Runtime/inference/common/inference_config:inference_config",
+        "//Omni-Runtime/utils:utils",
+    ],
+)
+
+cc_library(
+    name = "builtin_models",
+    srcs = ["builtin_models.cc"],
+    deps = [
+        ":registry",
+        "//Omni-Runtime/models/qwen3_vl:qwen3_vl",
+        "//Omni-Runtime/models/qwen3_5:qwen3_5",
+        "//Omni-Runtime/utils:utils",
+    ],
+)
+
+cc_test(
+    name = "registry_test",
+    srcs = ["registry_test.cc"],
+    copts = ["-std=c++20"],
+    data = ["//Omni-Runtime/inference/conf:qwen3_8_27B_nvfp4.conf"],
+    deps = [":registry", ":builtin_models", "@googletest//:gtest_main"],
+)

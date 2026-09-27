@@ -1,0 +1,3 @@
+{"id":"demo_caption","image":"demo.jpeg","prompt":"Describe this image.","task":"caption","required_keywords":["woman","dog","beach"],"reference":"local deterministic smoke case"}
+{"id":"bus_caption","image":"bus.jpg","prompt":"Describe this image.","task":"caption","required_keywords":["bus","street"],"reference":"Ultralytics bus image smoke case"}
+{"id":"demo_object","image":"demo.jpeg","prompt":"What animal is shown in the image? Answer with only the animal name.","task":"vqa","answers":["dog","a dog"],"reference":"local deterministic smoke case"}

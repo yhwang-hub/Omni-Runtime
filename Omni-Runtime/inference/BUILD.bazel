@@ -1,0 +1,135 @@
+package(default_visibility = ["//visibility:public"])
+
+cc_library(
+    name = "executor",
+    hdrs = [
+        "executor/executor_define.h",
+        "executor/model_executor.h",
+    ],
+    copts = ["-std=c++20"],
+    deps = [
+        "//Omni-Runtime/inference/common/inference_define:inference_define",
+        "//Omni-Runtime/memory:memory",
+        "//Omni-Runtime/utils:utils",
+    ],
+)
+
+cc_library(
+    name = "engine",
+    srcs = ["engine/inference_engine.cc"],
+    hdrs = ["engine/inference_engine.h"],
+    deps = [
+        ":executor",
+        "//Omni-Runtime/models:registry",
+        "//Omni-Runtime/models:builtin_models",
+        "//Omni-Runtime/utils:utils",
+    ],
+)
+
+cc_library(
+    name = "weight_loader",
+    srcs = ["model_loader/weight_loader.cc"],
+    hdrs = ["model_loader/weight_define.h", "model_loader/weight_loader.h"],
+    deps = [
+        "//Omni-Runtime/gguf_serializer:gguf_serializer",
+        "//Omni-Runtime/inference/common/inference_define:inference_define",
+        "//Omni-Runtime/memory:memory",
+        "//Omni-Runtime/utils:utils",
+    ],
+)
+
+cc_library(
+    name = "generation",
+    srcs = ["generation/autoregressive_runner.cc"],
+    hdrs = ["generation/autoregressive_runner.h"],
+    copts = ["-std=c++20"],
+    deps = [
+        ":inference",
+        "//Omni-Runtime/inference/common/inference_define:inference_define",
+        "//Omni-Runtime/inference/common/text_stream:text_stream",
+        "//Omni-Runtime/utils:utils",
+    ],
+)
+
+cc_test(
+    name = "weight_loader_test",
+    srcs = ["model_loader/weight_loader_test.cc"],
+    data = ["//model/qwen3_vl:models"],
+    deps = [":weight_loader", "//Omni-Runtime/backend:backend", "@googletest//:gtest_main"],
+)
+
+cc_test(
+    name = "inference_engine_test",
+    srcs = ["engine/inference_engine_test.cc"],
+    copts = ["-std=c++20"],
+    deps = [":engine", ":generation", ":inference", "//Omni-Runtime/utils:utils",
+            "@googletest//:gtest_main"],
+)
+
+cc_library(
+    name = "inference",
+    srcs = [
+        "inference_graph/inference_graph.cc",
+        "sampling/sampler.cc",
+        "tokenizer/byte_pair_tokenizer.cc",
+        "tokenizer/chat_template.cc",
+        "tokenizer/gguf_tokenizer_loader.cc",
+        "tokenizer/tokenizer.cc",
+        "tokenizer/tokenizer_factory.cc",
+        "tokenizer/unigram_tokenizer.cc",
+        "tokenizer/word_piece_tokenizer.cc",
+    ],
+    hdrs = [
+        "inference_graph/inference_graph.h",
+        "sampling/sampler.h",
+        "tokenizer/byte_pair_tokenizer.h",
+        "tokenizer/chat_template.h",
+        "tokenizer/gguf_tokenizer_loader.h",
+        "tokenizer/tokenizer.h",
+        "tokenizer/tokenizer_define.h",
+        "tokenizer/tokenizer_factory.h",
+        "tokenizer/unigram_tokenizer.h",
+        "tokenizer/word_piece_tokenizer.h",
+    ],
+    copts = ["-std=c++20"],
+    deps = [
+        "//Omni-Runtime/gguf_serializer:gguf_serializer",
+        "//Omni-Runtime/graph:graph",
+        "//Omni-Runtime/inference/common/inference_define:inference_define",
+        "//Omni-Runtime/utils:utils",
+    ],
+)
+
+cc_library(
+    name = "operator_graph",
+    srcs = ["inference_graph/operator_graph.cc"],
+    hdrs = [
+        "inference_graph/operator_graph.h",
+        "inference_graph/operator_graph_define.h",
+    ],
+    copts = ["-std=c++20"],
+    deps = [
+        ":inference",
+        "//Omni-Runtime/backend:backend",
+        "//Omni-Runtime/utils:utils",
+        "@yaml-cpp//:yaml-cpp",
+    ],
+)
+
+cc_test(
+    name = "operator_graph_test",
+    srcs = ["inference_graph/operator_graph_test.cc"],
+    data = ["//Omni-Runtime/models/qwen3_vl:graphs"],
+    deps = [":operator_graph", "//Omni-Runtime/memory:memory", "@googletest//:gtest_main"],
+)
+
+cc_test(
+    name = "tokenizer_tests",
+    srcs = ["tokenizer/tokenizer_test.cc"],
+    copts = ["-std=c++20"],
+    deps = [
+        ":inference",
+        "@googletest//:gtest_main",
+    ],
+    data = ["//model/qwen3_vl:models"],
+)

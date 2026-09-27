@@ -1,0 +1,415 @@
+# Shapes, layer counts and weight names are bound from GGUF; buffers are backend-neutral.
+backend: cuda
+
+vision:
+  - op: ImagePatchPreprocess
+    source: source
+    pixel_count: pixels
+    source_width_pixels: resized_width
+    source_height_pixels: resized_height
+    input_width_pixels: input_width
+    input_height_pixels: input_height
+    patch_size: patch_size
+    destination: patches
+
+  - op: PairedPatchEmbedding
+    input: patches
+    first_weight: v.patch_embd.weight
+    second_weight: v.patch_embd.weight.1
+    bias: v.patch_embd.bias
+    height: resized_height
+    width: resized_width
+    channels: 3
+    output_channels: v_hidden
+    spatial_patch: patch_size
+    output: patch_embedding
+
+  - op: GridPositionEmbedding
+    input: patch_embedding
+    position_weight: v.position_embd.weight
+    grid_height: grid_height
+    grid_width: grid_width
+    position_grid_size: 48
+    hidden_size: v_hidden
+    merge_size: merge_size
+    output: hidden
+
+  - repeat: vision_layers
+    as: vision_layer
+    body:
+      - op: LayerNorm
+        input: hidden
+        weight: "v.blk.{vision_layer}.ln1.weight"
+        bias: "v.blk.{vision_layer}.ln1.bias"
+        rows: v_tokens
+        hidden_size: v_hidden
+        epsilon: v_epsilon
+        output: normalized
+
+      - op: Linear
+        input: normalized
+        weight: "v.blk.{vision_layer}.attn_qkv.weight"
+        rows: v_tokens
+        inner: v_hidden
+        columns: v_qkv
+        output: qkv
+
+      - op: Bias
+        input: qkv
+        bias: "v.blk.{vision_layer}.attn_qkv.bias"
+        element_count: v_qkv_values
+        row_size: v_qkv
+        output: qkv
+
+      - op: GridQkvRope
+        qkv: qkv
+        token_count: v_tokens
+        grid_height: grid_height
+        grid_width: grid_width
+        merge_size: merge_size
+        head_count: v_heads
+        head_size: v_head_size
+        query: query
+        key: key
+        value: value
+
+      - op: Attention
+        query: query
+        key_cache: key
+        value_cache: value
+        query_token_count: v_tokens
+        query_head_count: v_heads
+        key_value_head_count: v_heads
+        cached_token_count: v_tokens
+        start_position: 0
+        head_dim: v_head_size
+        is_causal: false
+        output: attention
+
+      - op: Linear
+        input: attention
+        weight: "v.blk.{vision_layer}.attn_out.weight"
+        rows: v_tokens
+        inner: v_hidden
+        columns: v_hidden
+        output: projected
+
+      - op: BiasResidual
+        input: projected
+        bias: "v.blk.{vision_layer}.attn_out.bias"
+        residual: hidden
+        element_count: v_hidden_values
+        row_size: v_hidden
+        output: residual
+
+      - op: LayerNorm
+        input: residual
+        weight: "v.blk.{vision_layer}.ln2.weight"
+        bias: "v.blk.{vision_layer}.ln2.bias"
+        rows: v_tokens
+        hidden_size: v_hidden
+        epsilon: v_epsilon
+        output: normalized
+
+      - op: Linear
+        input: normalized
+        weight: "v.blk.{vision_layer}.ffn_up.weight"
+        rows: v_tokens
+        inner: v_hidden
+        columns: v_ffn
+        output: feed_forward
+
+      - op: GeluBias
+        input: feed_forward
+        bias: "v.blk.{vision_layer}.ffn_up.bias"
+        element_count: v_ffn_values
+        row_size: v_ffn
+        is_approximate: true
+        output: feed_forward
+
+      - op: Linear
+        input: feed_forward
+        weight: "v.blk.{vision_layer}.ffn_down.weight"
+        rows: v_tokens
+        inner: v_ffn
+        columns: v_hidden
+        output: projected
+
+      - op: BiasResidual
+        input: projected
+        bias: "v.blk.{vision_layer}.ffn_down.bias"
+        residual: residual
+        element_count: v_hidden_values
+        row_size: v_hidden
+        output: hidden
+
+      - when: has_deepstack
+        body:
+          - op: LayerNorm
+            input: hidden
+            weight: "v.deepstack.{vision_layer}.norm.weight"
+            bias: "v.deepstack.{vision_layer}.norm.bias"
+            rows: merged_tokens
+            hidden_size: merged_hidden
+            epsilon: v_epsilon
+            output: normalized
+
+          - &projector
+            - op: Linear
+              input: normalized
+              weight: projector_first_weight
+              rows: merged_tokens
+              inner: merged_hidden
+              columns: merged_hidden
+              output: qkv
+
+            - op: GeluBias
+              input: qkv
+              bias: projector_first_bias
+              element_count: merged_values
+              row_size: merged_hidden
+              is_approximate: false
+              output: qkv
+
+            - op: Linear
+              input: qkv
+              weight: projector_second_weight
+              rows: merged_tokens
+              inner: merged_hidden
+              columns: projection_size
+              output: embedding
+
+            - op: Bias
+              input: embedding
+              bias: projector_second_bias
+              element_count: embedding_values
+              row_size: projection_size
+              output: embedding
+
+  - op: LayerNorm
+    input: hidden
+    weight: v.post_ln.weight
+    bias: v.post_ln.bias
+    rows: v_tokens
+    hidden_size: v_hidden
+    epsilon: v_epsilon
+    output: normalized
+
+  - *projector
+
+embedding:
+  - op: Embedding
+    indices: token_input
+    weight: token_embd.weight
+    token_count: tokens
+    hidden_size: hidden_size
+    output: hidden
+
+# Prefill and decode share the same transformer graph, including individual Q/K/V nodes.
+language:
+  - repeat: language_layers
+    as: layer
+    body:
+      - op: RmsNorm
+        input: hidden
+        weight: "blk.{layer}.attn_norm.weight"
+        rows: tokens
+        hidden_size: hidden_size
+        epsilon: epsilon
+        output: normalized
+
+      - parallel:
+          - op: Linear
+            input: normalized
+            weight: "blk.{layer}.attn_q.weight"
+            rows: tokens
+            inner: hidden_size
+            columns: query_size
+            output: query
+
+          - op: Linear
+            input: normalized
+            weight: "blk.{layer}.attn_k.weight"
+            rows: tokens
+            inner: hidden_size
+            columns: kv_size
+            output: key
+
+          - op: Linear
+            input: normalized
+            weight: "blk.{layer}.attn_v.weight"
+            rows: tokens
+            inner: hidden_size
+            columns: kv_size
+            output: value
+
+      - op: RmsNorm
+        when: is_prefill
+        input: query
+        weight: "blk.{layer}.attn_q_norm.weight"
+        rows: query_rows
+        hidden_size: head_size
+        epsilon: epsilon
+        output: query_normed
+
+      - op: RmsNorm
+        when: is_prefill
+        input: key
+        weight: "blk.{layer}.attn_k_norm.weight"
+        rows: kv_rows
+        hidden_size: head_size
+        epsilon: epsilon
+        output: key_normed
+
+      - op: MultiAxisRope
+        when: is_prefill
+        query: query_normed
+        key: key_normed
+        position_ids: positions
+        tokens: tokens
+        query_heads: query_heads
+        key_value_heads: kv_heads
+        head_dim: head_size
+        temporal_section: rope_t
+        height_section: rope_h
+        width_section: rope_w
+        frequency_base: rope_base
+        query_output: query
+        key_output: key
+
+      - op: StoreKvCache
+        when: is_prefill
+        key: key
+        value: value
+        token_count: tokens
+        key_value_size: kv_size
+        start_position: start_position
+        cache_capacity: capacity
+        key_cache: key_cache
+        value_cache: value_cache
+
+      - op: NormalizeRopeCache
+        when: is_decode
+        query: query
+        key: key
+        value: value
+        query_weight: "blk.{layer}.attn_q_norm.weight"
+        key_weight: "blk.{layer}.attn_k_norm.weight"
+        positions: positions
+        cache_position: cache_position
+        query_heads: query_heads
+        key_value_heads: kv_heads
+        head_dim: head_size
+        cache_capacity: capacity
+        temporal_section: rope_t
+        height_section: rope_h
+        width_section: rope_w
+        frequency_base: rope_base
+        epsilon: epsilon
+        query_output: query
+        key_cache: key_cache
+        value_cache: value_cache
+
+      - op: Attention
+        query: query
+        key_cache: key_cache
+        value_cache: value_cache
+        query_token_count: tokens
+        query_head_count: query_heads
+        key_value_head_count: kv_heads
+        cached_token_count: cached_tokens
+        start_position: start_position
+        head_dim: head_size
+        is_causal: true
+        output: attention
+        decode_partials: decode_partials
+        cache_position: attention_position
+
+      - op: Linear
+        input: attention
+        weight: "blk.{layer}.attn_output.weight"
+        rows: tokens
+        inner: query_size
+        columns: hidden_size
+        output: projected
+
+      - op: ResidualRmsNorm
+        input: projected
+        residual: hidden
+        weight: "blk.{layer}.ffn_norm.weight"
+        rows: tokens
+        hidden_size: hidden_size
+        epsilon: epsilon
+        residual_output: next_hidden
+        output: normalized
+
+      - parallel:
+          - op: Linear
+            input: normalized
+            weight: "blk.{layer}.ffn_gate.weight"
+            rows: tokens
+            inner: hidden_size
+            columns: ffn_size
+            output: gate
+
+          - op: Linear
+            input: normalized
+            weight: "blk.{layer}.ffn_up.weight"
+            rows: tokens
+            inner: hidden_size
+            columns: ffn_size
+            output: up
+
+      - op: SwiGLU
+        gate: gate
+        up: up
+        element_count: ffn_values
+        output: gate
+
+      - op: Linear
+        input: gate
+        weight: "blk.{layer}.ffn_down.weight"
+        rows: tokens
+        inner: ffn_size
+        columns: hidden_size
+        output: projected
+
+      - op: Add
+        lhs: projected
+        rhs: next_hidden
+        element_count: hidden_values
+        output: hidden
+
+      - op: Add
+        when: has_deepstack
+        lhs: vision_hidden
+        rhs: deepstack_embedding
+        element_count: vision_values
+        output: vision_hidden
+
+  - op: RmsNorm
+    input: last_hidden
+    weight: output_norm.weight
+    rows: 1
+    hidden_size: hidden_size
+    epsilon: epsilon
+    output: normalized
+
+  - op: Linear
+    input: normalized
+    weight: output_weight
+    rows: 1
+    inner: hidden_size
+    columns: vocabulary
+    output: logits
+
+  - op: Argmax
+    logits: logits
+    rows: 1
+    columns: vocabulary
+    output: sample
+
+decode:
+  - op: AdvanceSequence
+    positions: positions
+    cache_position: cache_position

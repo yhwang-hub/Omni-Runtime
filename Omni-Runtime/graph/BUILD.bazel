@@ -1,0 +1,15 @@
+package(default_visibility = ["//visibility:public"])
+
+cc_library(
+    name = "graph",
+    srcs = glob(["**/*.cc"], exclude = ["**/*_test.cc"]),
+    hdrs = glob(["**/*.h"]),
+    deps = ["//Omni-Runtime/utils:utils"],
+)
+
+cc_test(
+    name = "graph_tests",
+    srcs = glob(["**/*_test.cc"]),
+    deps = [":graph", "@googletest//:gtest_main"],
+    tags = ["unit"],
+)

@@ -1,0 +1,23 @@
+package(default_visibility = ["//Omni-Runtime/models:__subpackages__"])
+
+cc_library(
+    name = "config",
+    srcs = ["config.cc"],
+    hdrs = ["config.h", "config_define.h"],
+    deps = [
+        "//Omni-Runtime/gguf_serializer:gguf_serializer",
+        "//Omni-Runtime/utils:utils",
+    ],
+)
+
+cc_library(
+    name = "graph_binding",
+    srcs = ["graph_binding.cc"],
+    hdrs = ["graph_binding.h"],
+    deps = [
+        ":config",
+        "//Omni-Runtime/inference:operator_graph",
+        "//Omni-Runtime/inference/common/image_preprocessor:image_preprocessor",
+        "//Omni-Runtime/utils:utils",
+    ],
+)

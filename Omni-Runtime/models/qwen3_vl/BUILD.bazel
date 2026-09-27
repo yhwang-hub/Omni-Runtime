@@ -1,0 +1,42 @@
+package(default_visibility = ["//visibility:public"])
+
+cc_library(
+    name = "weight_schema",
+    srcs = ["weight_schema.cc"],
+    hdrs = ["weight_schema.h", "config_define.h"],
+    deps = [
+        "//Omni-Runtime/gguf_serializer:gguf_serializer",
+        "//Omni-Runtime/models/components/qwen_multimodal:processor",
+        "//Omni-Runtime/models/components/qwen_vision:config",
+        "//Omni-Runtime/utils:utils",
+    ],
+)
+
+cc_library(
+    name = "qwen3_vl",
+    srcs = ["model.cc", "executor.cc", "graph_binding.cc", "runtime.cc"],
+    hdrs = ["model.h", "model_define.h", "executor.h"],
+    copts = ["-std=c++20"],
+    deps = [
+        ":weight_schema",
+        "//Omni-Runtime/backend:backend",
+        "//Omni-Runtime/gguf_serializer:gguf_serializer",
+        "//Omni-Runtime/inference:inference",
+        "//Omni-Runtime/inference:operator_graph",
+        "//Omni-Runtime/inference/common/inference_config:inference_config",
+        "//Omni-Runtime/inference/common/image_preprocessor:image_preprocessor",
+        "//Omni-Runtime/inference/common/text_stream:text_stream",
+        "//Omni-Runtime/memory:memory",
+        "//Omni-Runtime/inference:executor",
+        "//Omni-Runtime/inference:generation",
+        "//Omni-Runtime/inference:weight_loader",
+        "//Omni-Runtime/models:model",
+        "//Omni-Runtime/models/components/qwen_multimodal:processor",
+        "//Omni-Runtime/models/components/qwen_vision:graph_binding",
+    ],
+)
+
+filegroup(
+    name = "graphs",
+    srcs = ["graphs/qwen3-vl-8b-fp16.yaml"],
+)

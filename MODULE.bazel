@@ -1,0 +1,34 @@
+module(name = "omni_runtime", version = "0.1.0")
+
+bazel_dep(name = "googletest", version = "1.15.2")
+bazel_dep(name = "rules_cuda", version = "0.2.5")
+bazel_dep(name = "yaml-cpp", version = "0.8.0")
+local_path_override(
+    module_name = "googletest",
+    path = "/home/wangyh/workspace/TensorRT-Edge-LLM/3rdParty/googletest",
+)
+
+cuda = use_extension("@rules_cuda//cuda:extensions.bzl", "toolchain")
+cuda.local_toolchain(name = "local_cuda", toolkit_path = "")
+use_repo(cuda, "local_cuda")
+
+new_local_repository = use_repo_rule(
+    "@bazel_tools//tools/build_defs/repo:local.bzl",
+    "new_local_repository",
+)
+new_local_repository(
+    name = "qwen_fp8_blas",
+    path = "/home/wangyh/workspace/envs/qwen3.8-fp8/lib/python3.12/site-packages/nvidia/cu13/lib",
+    build_file_content = """
+package(default_visibility = ["//visibility:public"])
+cc_import(
+    name = "cublas_lt",
+    shared_library = "libcublasLt.so.13",
+)
+cc_import(
+    name = "cublas",
+    shared_library = "libcublas.so.13",
+    deps = [":cublas_lt"],
+)
+""",
+)

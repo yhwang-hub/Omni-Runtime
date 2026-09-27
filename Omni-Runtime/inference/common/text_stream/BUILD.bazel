@@ -1,0 +1,23 @@
+package(default_visibility = ["//visibility:public"])
+
+cc_library(
+    name = "text_stream",
+    srcs = ["text_stream.cc"],
+    hdrs = ["text_stream.h"],
+    copts = ["-std=c++20"],
+    deps = [
+        "//Omni-Runtime/inference/common/inference_define:inference_define",
+        "//Omni-Runtime/utils:utils",
+    ],
+)
+
+cc_test(
+    name = "text_stream_test",
+    srcs = ["text_stream_test.cc"],
+    copts = ["-std=c++20"],
+    deps = [
+        ":text_stream",
+        "//Omni-Runtime/inference/common/inference_define:inference_define",
+        "@googletest//:gtest_main",
+    ],
+)

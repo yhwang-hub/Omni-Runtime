@@ -1,0 +1,9 @@
+package(default_visibility = ["//visibility:public"])
+
+filegroup(
+    name = "models",
+    srcs = [
+        "Qwen3.8-27B-FP8.gguf",
+        "mmproj-Qwen3.8-27B-F32.gguf",
+    ],
+)
