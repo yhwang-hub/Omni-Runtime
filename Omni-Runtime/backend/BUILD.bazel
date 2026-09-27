@@ -1,0 +1,32 @@
+package(default_visibility = ["//visibility:public"])
+
+cc_library(
+    name = "backend",
+    srcs = [
+        "backend.cc",
+        "backend_cuda.cc",
+        "backend_opencl.cc",
+    ],
+    hdrs = [
+        "backend.h",
+        "backend_cuda.h",
+        "backend_define.h",
+        "backend_opencl.h",
+    ],
+    copts = ["-std=c++20"],
+    deps = [
+        "//Omni-Runtime/utils:utils",
+        "@local_cuda//:cuda_runtime",
+    ],
+    linkopts = ["-lOpenCL"],
+)
+
+cc_test(
+    name = "backend_test",
+    srcs = ["backend_test.cc"],
+    copts = ["-std=c++20"],
+    deps = [
+        ":backend",
+        "@googletest//:gtest_main",
+    ],
+)

@@ -1,0 +1,3 @@
+package(default_visibility = ["//visibility:public"])
+cc_library(name = "inference_config", hdrs = ["inference_config.h"], srcs = ["inference_config.cc"])
+cc_test(name = "inference_config_test", srcs = ["inference_config_test.cc"], deps = [":inference_config", "@googletest//:gtest_main"])

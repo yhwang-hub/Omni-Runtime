@@ -1,0 +1,12 @@
+package(default_visibility = ["//visibility:public"])
+cc_test(
+    name = "qwen3_vl_inference_test",
+    srcs = ["qwen3_vl_inference_test.cc"],
+    deps = ["//Omni-Runtime/models/qwen3_vl:qwen3_vl", "@googletest//:gtest_main"],
+    data = [
+        "//Omni-Runtime/inference/conf:qwen3_vl_8B_f16.conf",
+        "//test/inference:demo.jpeg",
+        "//test/inference:qwen3_vl_8b_expected.txt",
+    ],
+    tags = ["model_inference"],
+)

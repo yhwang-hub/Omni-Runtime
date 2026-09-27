@@ -1,0 +1,7 @@
+package(default_visibility = ["//visibility:public"])
+
+exports_files([
+    "bus.jpg",
+    "demo.jpeg",
+    "qwen3_vl_8b_expected.txt",
+])

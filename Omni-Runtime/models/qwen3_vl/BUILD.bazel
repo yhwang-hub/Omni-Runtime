@@ -1,0 +1,19 @@
+package(default_visibility = ["//visibility:public"])
+cc_library(
+    name = "qwen3_vl",
+    hdrs = glob(["*.h"]),
+    srcs = glob(["*.cc"], exclude = ["qwen3_vl_test.cc"]),
+    deps = [
+        "//Omni-Runtime/backend:backend",
+        "//Omni-Runtime/inference:inference",
+        "//Omni-Runtime/inference/common/inference_config:inference_config",
+        "//Omni-Runtime/kernels:kernels",
+        "//Omni-Runtime/memory:memory",
+    ],
+)
+cc_test(
+    name = "qwen3_vl_test",
+    srcs = ["qwen3_vl_test.cc"],
+    deps = [":qwen3_vl", "@googletest//:gtest_main"],
+    data = ["//Omni-Runtime/inference/conf:qwen3_vl_8B_f16.conf", "//test/inference:demo.jpeg"],
+)

@@ -1,0 +1,25 @@
+package(default_visibility = ["//visibility:public"])
+
+cc_library(
+    name = "inference",
+    srcs = glob([
+        "common/**/*.cc",
+        "inference_graph/*.cc",
+        "sampling/*.cc",
+        "tokenizer/*.cc",
+        "executor/*.cc",
+    ], exclude = ["**/*_test.cc"]),
+    hdrs = glob(["**/*.h"]),
+    deps = [
+        "//Omni-Runtime/gguf_serializer:gguf_serializer",
+        "//Omni-Runtime/graph:graph",
+        "//Omni-Runtime/utils:utils",
+    ],
+)
+
+cc_test(
+    name = "tokenizer_tests",
+    srcs = ["tokenizer/tokenizer_test.cc"],
+    deps = [":inference", "@googletest//:gtest_main"],
+    data = ["//model/qwen3_vl:models"],
+)

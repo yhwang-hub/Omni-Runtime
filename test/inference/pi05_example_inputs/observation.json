@@ -1,0 +1,53 @@
+{
+  "description": "Single LIBERO-style observation for pi0.5 (pi05_base) inference.",
+  "source_spec": "openpi/src/openpi/policies/libero_policy.py:make_libero_example",
+  "prompt": "pick up the black bowl between the plate and the ramekin and place it on the plate",
+  "fields": {
+    "base_0_rgb.png": {
+      "role": "third-person camera",
+      "shape": [
+        224,
+        224,
+        3
+      ],
+      "dtype": "uint8"
+    },
+    "left_wrist_0_rgb.png": {
+      "role": "left wrist camera",
+      "shape": [
+        224,
+        224,
+        3
+      ],
+      "dtype": "uint8"
+    },
+    "right_wrist_0_rgb.png": {
+      "role": "padding camera (LIBERO has none)",
+      "shape": [
+        224,
+        224,
+        3
+      ],
+      "dtype": "uint8"
+    },
+    "state.npy": {
+      "role": "proprioceptive state",
+      "shape": [
+        8
+      ],
+      "dtype": "float32",
+      "layout": "eef_pos(3) + eef_axis_angle(3) + gripper_qpos(2)",
+      "values": [
+        0.012000000104308128,
+        -0.03099999949336052,
+        1.0140000581741333,
+        3.121000051498413,
+        -0.02800000086426735,
+        0.04100000113248825,
+        0.020999999716877937,
+        -0.019999999552965164
+      ]
+    }
+  },
+  "notes": "Camera frames are synthesized deterministically (seed=0) as a plausible table-top scene because the LIBERO dataset is unavailable offline; all shapes/dtypes/keys follow the open-source LIBERO observation spec."
+}
