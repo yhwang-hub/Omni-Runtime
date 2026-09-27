@@ -1,0 +1,32 @@
+package(default_visibility = ["//visibility:public"])
+
+cc_library(
+    name = "qwen3_vl",
+    srcs = glob(["*.cc"], exclude = ["qwen3_vl_test.cc"]),
+    hdrs = glob(["*.h"]),
+    copts = ["-std=c++20"],
+    deps = [
+        "//Omni-Runtime/backend:backend",
+        "//Omni-Runtime/gguf_serializer:gguf_serializer",
+        "//Omni-Runtime/inference:inference",
+        "//Omni-Runtime/inference:operator_graph",
+        "//Omni-Runtime/inference/common/inference_config:inference_config",
+        "//Omni-Runtime/inference/common/image_preprocessor:image_preprocessor",
+        "//Omni-Runtime/inference/common/text_stream:text_stream",
+        "//Omni-Runtime/memory:memory",
+        "//Omni-Runtime/models/common:qwen3_vision_define",
+    ],
+)
+
+cc_test(
+    name = "qwen3_vl_test",
+    srcs = ["qwen3_vl_test.cc"],
+    copts = ["-std=c++20"],
+    data = [
+        "//Omni-Runtime/inference/conf:qwen3_vl_8B_f16.yaml",
+    ],
+    deps = [
+        ":qwen3_vl",
+        "@googletest//:gtest_main",
+    ],
+)

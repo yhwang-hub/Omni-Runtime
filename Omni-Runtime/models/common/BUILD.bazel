@@ -1,0 +1,7 @@
+package(default_visibility = ["//visibility:public"])
+
+cc_library(
+    name = "qwen3_vision_define",
+    hdrs = ["qwen3_vision_define.h"],
+    copts = ["-std=c++20"],
+)

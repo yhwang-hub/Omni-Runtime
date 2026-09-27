@@ -1,0 +1,15 @@
+package(default_visibility = ["//visibility:public"])
+
+cc_library(
+    name = "gguf_serializer",
+    hdrs = ["GGUF.h", "gguf_serializer.h"],
+    srcs = ["gguf_serializer.cc"],
+    deps = ["//Omni-Runtime/utils:utils"],
+)
+
+cc_test(
+    name = "gguf_serializer_test",
+    srcs = ["gguf_serializer_test.cc"],
+    deps = [":gguf_serializer", "@googletest//:gtest_main"],
+    data = ["//model/qwen3_vl:models"],
+)

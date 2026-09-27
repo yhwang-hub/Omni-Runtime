@@ -1,0 +1,44 @@
+package(default_visibility = ["//visibility:public"])
+
+cc_test(
+    name = "qwen3.8_27B_nvfp4_inference_test",
+    srcs = ["qwen3.8_27B_nvfp4_inference_test.cc"],
+    copts = ["-std=c++20"],
+    deps = [
+        "//Omni-Runtime/models/qwen3_8_nvfp4:qwen3_8_nvfp4",
+        "@googletest//:gtest_main",
+    ],
+    data = [
+        "//Omni-Runtime/inference/conf:qwen3_8_27B_nvfp4.conf",
+        "//Omni-Runtime/inference/conf:qwen3_8_27B_nvfp4.yaml",
+        "//Omni-Runtime/kernels:kernel_sources",
+        "//model/qwen3_8_nvfp4:models",
+        "//test/inference:demo.jpeg",
+        "//test/inference:qwen3_8_27b_llama.txt",
+    ],
+    tags = ["exclusive", "model_inference"],
+    timeout = "long",
+)
+
+cc_test(
+    name = "qwen3_vl_inference_test",
+    srcs = ["qwen3_vl_inference_test.cc"],
+    copts = ["-std=c++20"],
+    deps = [
+        "//Omni-Runtime/models/qwen3_vl:qwen3_vl",
+        "@googletest//:gtest_main",
+    ],
+    data = [
+        "//Omni-Runtime/inference/conf:qwen3_vl_8B_f16.conf",
+        "//Omni-Runtime/inference/conf:qwen3_vl_8B_f16.yaml",
+        "//Omni-Runtime/kernels:kernel_sources",
+        "//model/qwen3_vl:models",
+        "//test/inference:demo.jpeg",
+        "//test/inference:qwen3_vl_8b_fp16.txt",
+        "//test/inference:qwen3_vl_8b_fp16.tokens",
+        "//test/inference:qwen3_vl_8b_fp16_long.txt",
+        "//test/inference:qwen3_vl_8b_fp16_long.tokens",
+    ],
+    tags = ["model_inference"],
+    timeout = "long",
+)

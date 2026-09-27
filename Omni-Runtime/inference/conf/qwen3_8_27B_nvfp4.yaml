@@ -1,0 +1,599 @@
+# Shapes, layer kinds, storage types and global NVFP4 scales are bound from GGUF.
+# OMNI_BACKEND can explicitly select opencl without editing this layout.
+backend: cuda
+
+vision:
+  - op: ImagePatchPreprocess
+    source: vision_source
+    pixel_count: pixels
+    source_width_pixels: resized_width
+    source_height_pixels: resized_height
+    input_width_pixels: input_width
+    input_height_pixels: input_height
+    is_letterbox: true
+    patch_size: patch_size
+    destination: vision_patches
+  - op: PairedPatchEmbedding
+    is_fp16_projection: true
+    input: vision_patches
+    first_weight: v.patch_embd.weight
+    second_weight: v.patch_embd.weight.1
+    bias: v.patch_embd.bias
+    height: resized_height
+    width: resized_width
+    channels: 3
+    output_channels: v_hidden
+    spatial_patch: patch_size
+    output: vision_patch_embedding
+  - op: GridPositionEmbedding
+    is_ggml_interpolation: true
+    input: vision_patch_embedding
+    position_weight: v.position_embd.weight
+    grid_height: grid_height
+    grid_width: grid_width
+    position_grid_size: position_grid_size
+    hidden_size: v_hidden
+    merge_size: merge_size
+    output: vision_hidden
+  - repeat: vision_layers
+    as: vision_layer
+    body:
+      - op: LayerNorm
+        is_ggml_normalization: true
+        input: vision_hidden
+        weight: "v.blk.{vision_layer}.ln1.weight"
+        bias: "v.blk.{vision_layer}.ln1.bias"
+        rows: v_tokens
+        hidden_size: v_hidden
+        epsilon: v_epsilon
+        output: vision_normalized
+      - op: QuantizedLinear
+        input: vision_normalized
+        weight: "v.blk.{vision_layer}.attn_qkv.weight"
+        weight_type: "v.blk.{vision_layer}.attn_qkv.weight.type"
+        weight_scale: 1
+        rows: v_tokens
+        inner: v_hidden
+        columns: v_qkv
+        output: vision_qkv
+      - op: Bias
+        input: vision_qkv
+        bias: "v.blk.{vision_layer}.attn_qkv.bias"
+        element_count: v_qkv_values
+        row_size: v_qkv
+        output: vision_qkv
+      - op: GridQkvRope
+        is_fp16_key_value: true
+        is_ggml_rope: true
+        qkv: vision_qkv
+        token_count: v_tokens
+        grid_height: grid_height
+        grid_width: grid_width
+        merge_size: merge_size
+        head_count: v_heads
+        head_size: v_head_size
+        query: vision_query
+        key: vision_key
+        value: vision_value
+      - op: Attention
+        is_fp16_attention: true
+        is_fp16_accumulation: true
+        is_fp16_key_value: true
+        query: vision_query
+        key_cache: vision_key
+        value_cache: vision_value
+        query_token_count: v_tokens
+        query_head_count: v_heads
+        key_value_head_count: v_heads
+        cached_token_count: v_tokens
+        start_position: 0
+        head_dim: v_head_size
+        is_causal: false
+        output: vision_attention
+      - op: QuantizedLinear
+        input: vision_attention
+        weight: "v.blk.{vision_layer}.attn_out.weight"
+        weight_type: "v.blk.{vision_layer}.attn_out.weight.type"
+        weight_scale: 1
+        rows: v_tokens
+        inner: v_hidden
+        columns: v_hidden
+        output: vision_projected
+      - op: BiasResidual
+        input: vision_projected
+        bias: "v.blk.{vision_layer}.attn_out.bias"
+        residual: vision_hidden
+        element_count: v_hidden_values
+        row_size: v_hidden
+        output: vision_residual
+      - op: LayerNorm
+        is_ggml_normalization: true
+        input: vision_residual
+        weight: "v.blk.{vision_layer}.ln2.weight"
+        bias: "v.blk.{vision_layer}.ln2.bias"
+        rows: v_tokens
+        hidden_size: v_hidden
+        epsilon: v_epsilon
+        output: vision_normalized
+      - op: QuantizedLinear
+        input: vision_normalized
+        weight: "v.blk.{vision_layer}.ffn_up.weight"
+        weight_type: "v.blk.{vision_layer}.ffn_up.weight.type"
+        weight_scale: 1
+        rows: v_tokens
+        inner: v_hidden
+        columns: v_ffn
+        output: vision_feed_forward
+      - op: GeluBias
+        is_ggml_gelu: true
+        input: vision_feed_forward
+        bias: "v.blk.{vision_layer}.ffn_up.bias"
+        element_count: v_ffn_values
+        row_size: v_ffn
+        is_approximate: true
+        output: vision_feed_forward
+      - op: QuantizedLinear
+        input: vision_feed_forward
+        weight: "v.blk.{vision_layer}.ffn_down.weight"
+        weight_type: "v.blk.{vision_layer}.ffn_down.weight.type"
+        weight_scale: 1
+        rows: v_tokens
+        inner: v_ffn
+        columns: v_hidden
+        output: vision_projected
+      - op: BiasResidual
+        input: vision_projected
+        bias: "v.blk.{vision_layer}.ffn_down.bias"
+        residual: vision_residual
+        element_count: v_hidden_values
+        row_size: v_hidden
+        output: vision_hidden
+  - op: LayerNorm
+    is_ggml_normalization: true
+    input: vision_hidden
+    weight: v.post_ln.weight
+    bias: v.post_ln.bias
+    rows: v_tokens
+    hidden_size: v_hidden
+    epsilon: v_epsilon
+    output: vision_normalized
+  - op: QuantizedLinear
+    input: vision_normalized
+    weight: mm.0.weight
+    weight_type: mm.0.weight.type
+    weight_scale: 1
+    rows: merged_tokens
+    inner: merged_hidden
+    columns: merged_hidden
+    output: vision_qkv
+  - op: GeluBias
+    is_ggml_gelu: true
+    input: vision_qkv
+    bias: mm.0.bias
+    element_count: merged_values
+    row_size: merged_hidden
+    is_approximate: true
+    output: vision_qkv
+  - op: QuantizedLinear
+    input: vision_qkv
+    weight: mm.2.weight
+    weight_type: mm.2.weight.type
+    weight_scale: 1
+    rows: merged_tokens
+    inner: merged_hidden
+    columns: projection_size
+    output: image_embedding
+  - op: Bias
+    input: image_embedding
+    bias: mm.2.bias
+    element_count: embedding_values
+    row_size: projection_size
+    output: image_embedding
+
+embedding:
+  - op: QuantizedEmbedding
+    indices: token_input
+    weight: token_embd.weight
+    weight_type: token_embd.weight.type
+    token_count: tokens
+    hidden_size: hidden_size
+    vocabulary_size: vocabulary
+    output: hidden
+
+language:
+  - repeat: language_layers
+    as: layer
+    body:
+      - op: RmsNorm
+        is_ggml_normalization: true
+        input: hidden
+        weight: "blk.{layer}.attn_norm.weight"
+        rows: tokens
+        hidden_size: hidden_size
+        epsilon: epsilon
+        output: normalized
+      - op: QuantizeActivation
+        is_ggml_rounding: true
+        input: normalized
+        weight_type: 8
+        is_packed_q8: true
+        rows: tokens
+        columns: hidden_size
+        is_decode: is_quantized_decode
+        output: normalized_q8
+        scales: normalized_q8_scales
+      - when: is_recurrent
+        body:
+          - op: QuantizedLinear
+            input: normalized_q8
+            weight: "blk.{layer}.attn_qkv.weight"
+            is_packed_q8: true
+            is_ggml_split_k: true
+            weight_type: "blk.{layer}.attn_qkv.weight.type"
+            weight_scale: "blk.{layer}.attn_qkv.weight.scale"
+            rows: tokens
+            inner: hidden_size
+            columns: recurrent_channels
+            output: qkv
+            activation_scales: normalized_q8_scales
+            activation_block_size: 32
+          - op: QuantizedLinear
+            input: normalized_q8
+            weight: "blk.{layer}.attn_gate.weight"
+            is_packed_q8: true
+            is_ggml_split_k: true
+            weight_type: "blk.{layer}.attn_gate.weight.type"
+            weight_scale: "blk.{layer}.attn_gate.weight.scale"
+            rows: tokens
+            inner: hidden_size
+            columns: recurrent_size
+            output: z
+            activation_scales: normalized_q8_scales
+            activation_block_size: 32
+          - op: QuantizedLinear
+            input: normalized_q8
+            weight: "blk.{layer}.ssm_alpha.weight"
+            is_packed_q8: true
+            is_ggml_split_k: true
+            weight_type: "blk.{layer}.ssm_alpha.weight.type"
+            weight_scale: "blk.{layer}.ssm_alpha.weight.scale"
+            rows: tokens
+            inner: hidden_size
+            columns: recurrent_heads
+            output: alpha
+            activation_scales: normalized_q8_scales
+            activation_block_size: 32
+          - op: QuantizedLinear
+            input: normalized_q8
+            weight: "blk.{layer}.ssm_beta.weight"
+            is_packed_q8: true
+            is_ggml_split_k: true
+            weight_type: "blk.{layer}.ssm_beta.weight.type"
+            weight_scale: "blk.{layer}.ssm_beta.weight.scale"
+            rows: tokens
+            inner: hidden_size
+            columns: recurrent_heads
+            output: beta
+            activation_scales: normalized_q8_scales
+            activation_block_size: 32
+          - op: CausalConv1d
+            input: qkv
+            weight: "blk.{layer}.ssm_conv1d.weight"
+            state: convolution_state
+            token_count: tokens
+            channels: recurrent_channels
+            kernel_size: conv_size
+            output: convolved
+          - op: GatedDeltaNet
+            qkv: convolved
+            alpha: alpha
+            beta: beta
+            decay_weight: "blk.{layer}.ssm_a"
+            time_bias: "blk.{layer}.ssm_dt.bias"
+            state: recurrent_state
+            token_count: tokens
+            key_head_count: recurrent_key_heads
+            value_head_count: recurrent_heads
+            head_size: recurrent_head_size
+            epsilon: epsilon
+            output: delta
+          - op: RmsNorm
+            is_ggml_normalization: true
+            input: delta
+            weight: "blk.{layer}.ssm_norm.weight"
+            rows: recurrent_rows
+            hidden_size: recurrent_head_size
+            epsilon: epsilon
+            output: delta_normed
+          - op: SwiGLU
+            is_ggml_silu: true
+            gate: z
+            up: delta_normed
+            element_count: recurrent_values
+            output: delta_normed
+          - op: QuantizeActivation
+            is_ggml_rounding: true
+            input: delta_normed
+            weight_type: 8
+            is_packed_q8: true
+            rows: tokens
+            columns: recurrent_size
+            is_decode: is_quantized_decode
+            output: delta_quantized
+            scales: delta_scales
+          - op: QuantizedLinear
+            input: delta_quantized
+            weight: "blk.{layer}.ssm_out.weight"
+            is_packed_q8: true
+            is_ggml_split_k: true
+            weight_type: "blk.{layer}.ssm_out.weight.type"
+            weight_scale: "blk.{layer}.ssm_out.weight.scale"
+            rows: tokens
+            inner: recurrent_size
+            columns: hidden_size
+            output: projected
+            activation_scales: delta_scales
+            activation_block_size: 32
+      - when: is_full_attention
+        body:
+          - op: QuantizedLinear
+            input: normalized_q8
+            weight: "blk.{layer}.attn_q.weight"
+            is_packed_q8: true
+            is_ggml_split_k: true
+            weight_type: "blk.{layer}.attn_q.weight.type"
+            weight_scale: "blk.{layer}.attn_q.weight.scale"
+            rows: tokens
+            inner: hidden_size
+            columns: query_gate_size
+            output: qg
+            activation_scales: normalized_q8_scales
+            activation_block_size: 32
+          - op: QuantizedLinear
+            input: normalized_q8
+            weight: "blk.{layer}.attn_k.weight"
+            is_packed_q8: true
+            is_ggml_split_k: true
+            weight_type: "blk.{layer}.attn_k.weight.type"
+            weight_scale: "blk.{layer}.attn_k.weight.scale"
+            rows: tokens
+            inner: hidden_size
+            columns: kv_size
+            output: key
+            activation_scales: normalized_q8_scales
+            activation_block_size: 32
+          - op: QuantizedLinear
+            input: normalized_q8
+            weight: "blk.{layer}.attn_v.weight"
+            is_packed_q8: true
+            is_ggml_split_k: true
+            weight_type: "blk.{layer}.attn_v.weight.type"
+            weight_scale: "blk.{layer}.attn_v.weight.scale"
+            rows: tokens
+            inner: hidden_size
+            columns: kv_size
+            output: value
+            activation_scales: normalized_q8_scales
+            activation_block_size: 32
+          - op: SplitGatedQuery
+            query_gate: qg
+            token_count: tokens
+            head_count: query_heads
+            head_size: head_size
+            query: query
+            gate: attention_gate
+          - op: RmsNorm
+            is_ggml_normalization: true
+            input: query
+            weight: "blk.{layer}.attn_q_norm.weight"
+            rows: query_rows
+            hidden_size: head_size
+            epsilon: epsilon
+            output: query_normed
+          - op: RmsNorm
+            is_ggml_normalization: true
+            input: key
+            weight: "blk.{layer}.attn_k_norm.weight"
+            rows: kv_rows
+            hidden_size: head_size
+            epsilon: epsilon
+            output: key_normed
+          - op: PartialMultiAxisRope
+            query: query_normed
+            key: key_normed
+            position_ids: positions
+            tokens: tokens
+            query_heads: query_heads
+            key_value_heads: kv_heads
+            head_dim: head_size
+            rotary_dim: rotary_size
+            temporal_section: rope_t
+            height_section: rope_h
+            width_section: rope_w
+            frequency_base: rope_base
+            query_output: query
+            key_output: key
+          - op: StoreKvCache
+            is_fp16_cache: true
+            is_fp16_key_value: true
+            key: key
+            value: value
+            token_count: tokens
+            key_value_size: kv_size
+            start_position: start_position
+            cache_capacity: capacity
+            key_cache: key_cache
+            value_cache: value_cache
+            cache_position: attention_position
+          - op: Attention
+            is_fp16_attention: true
+            is_fp16_key_value: true
+            query: query
+            key_cache: key_cache
+            value_cache: value_cache
+            is_ggml_softmax: true
+            query_token_count: tokens
+            query_head_count: query_heads
+            key_value_head_count: kv_heads
+            cached_token_count: cached_tokens
+            start_position: start_position
+            head_dim: head_size
+            is_causal: true
+            output: attention
+            decode_partials: decode_partials
+            cache_position: attention_position
+          - op: SigmoidGate
+            input: attention
+            gate: attention_gate
+            element_count: query_values
+            output: attention
+          - op: QuantizeActivation
+            is_ggml_rounding: true
+            input: attention
+            weight_type: 8
+            is_packed_q8: true
+            rows: tokens
+            columns: query_size
+            is_decode: is_quantized_decode
+            output: attention_quantized
+            scales: attention_scales
+          - op: QuantizedLinear
+            input: attention_quantized
+            weight: "blk.{layer}.attn_output.weight"
+            is_packed_q8: true
+            is_ggml_split_k: true
+            weight_type: "blk.{layer}.attn_output.weight.type"
+            weight_scale: "blk.{layer}.attn_output.weight.scale"
+            rows: tokens
+            inner: query_size
+            columns: hidden_size
+            output: projected
+            activation_scales: attention_scales
+            activation_block_size: 32
+      - op: ResidualRmsNorm
+        is_ggml_normalization: true
+        input: projected
+        residual: hidden
+        weight: "blk.{layer}.post_attention_norm.weight"
+        rows: tokens
+        hidden_size: hidden_size
+        epsilon: epsilon
+        residual_output: residual
+        output: normalized
+      - op: QuantizeActivation
+        is_ggml_rounding: true
+        input: normalized
+        weight_type: ffn_type
+        is_packed_nvfp4: is_packed_nvfp4
+        is_packed_q8: is_packed_ffn_q8
+        rows: tokens
+        columns: hidden_size
+        is_decode: is_quantized_decode
+        output: normalized_ffn
+        scales: normalized_ffn_scales
+      - op: QuantizedLinear
+        input: normalized_ffn
+        weight: "blk.{layer}.ffn_gate.weight"
+        is_packed_nvfp4: is_packed_nvfp4
+        is_packed_q8: is_packed_ffn_q8
+        is_ggml_split_k: true
+        weight_type: "blk.{layer}.ffn_gate.weight.type"
+        weight_scale: "blk.{layer}.ffn_gate.weight.scale"
+        rows: tokens
+        inner: hidden_size
+        columns: ffn_size
+        output: gate
+        activation_scales: normalized_ffn_scales
+        activation_block_size: ffn_block_size
+      - op: QuantizedLinear
+        input: normalized_ffn
+        weight: "blk.{layer}.ffn_up.weight"
+        is_packed_nvfp4: is_packed_nvfp4
+        is_packed_q8: is_packed_ffn_q8
+        is_ggml_split_k: true
+        weight_type: "blk.{layer}.ffn_up.weight.type"
+        weight_scale: "blk.{layer}.ffn_up.weight.scale"
+        rows: tokens
+        inner: hidden_size
+        columns: ffn_size
+        output: up
+        activation_scales: normalized_ffn_scales
+        activation_block_size: ffn_block_size
+      - op: SwiGLU
+        is_ggml_silu: true
+        gate: gate
+        up: up
+        element_count: ffn_values
+        output: gate
+      - op: QuantizeActivation
+        is_ggml_rounding: true
+        input: gate
+        weight_type: ffn_type
+        is_packed_nvfp4: is_packed_nvfp4
+        is_packed_q8: is_packed_ffn_q8
+        rows: tokens
+        columns: ffn_size
+        is_decode: is_quantized_decode
+        output: ffn_quantized
+        scales: ffn_scales
+      - op: QuantizedLinear
+        input: ffn_quantized
+        weight: "blk.{layer}.ffn_down.weight"
+        is_packed_nvfp4: is_packed_nvfp4
+        is_packed_q8: is_packed_ffn_q8
+        is_ggml_split_k: true
+        weight_type: "blk.{layer}.ffn_down.weight.type"
+        weight_scale: "blk.{layer}.ffn_down.weight.scale"
+        rows: tokens
+        inner: ffn_size
+        columns: hidden_size
+        output: projected
+        activation_scales: ffn_scales
+        activation_block_size: ffn_block_size
+      - op: Add
+        lhs: projected
+        rhs: residual
+        element_count: hidden_values
+        output: hidden
+
+sampling:
+  - op: RmsNorm
+    is_ggml_normalization: true
+    input: last_hidden
+    weight: output_norm.weight
+    rows: 1
+    hidden_size: hidden_size
+    epsilon: epsilon
+    output: normalized
+  - op: QuantizeActivation
+    is_ggml_rounding: true
+    input: normalized
+    weight_type: 8
+    is_packed_q8: true
+    rows: 1
+    columns: hidden_size
+    is_decode: true
+    output: output_quantized
+    scales: output_scales
+  - op: QuantizedLinear
+    input: output_quantized
+    weight: output.weight
+    is_packed_q8: true
+    weight_type: output.weight.type
+    weight_scale: output.weight.scale
+    rows: 1
+    inner: hidden_size
+    columns: vocabulary
+    output: logits
+    activation_scales: output_scales
+    activation_block_size: 32
+  - op: Argmax
+    logits: logits
+    rows: 1
+    columns: vocabulary
+    output: sample
+
+decode:
+  - op: AdvanceSequence
+    positions: positions
+    cache_position: cache_position

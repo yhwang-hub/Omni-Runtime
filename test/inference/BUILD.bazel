@@ -1,0 +1,12 @@
+package(default_visibility = ["//visibility:public"])
+
+exports_files([
+    "bus.jpg",
+    "demo.jpeg",
+    "qwen3_8_27b_llama.txt",
+    "qwen3_vl_8b_expected.txt",
+    "qwen3_vl_8b_fp16.txt",
+    "qwen3_vl_8b_fp16.tokens",
+    "qwen3_vl_8b_fp16_long.txt",
+    "qwen3_vl_8b_fp16_long.tokens",
+])

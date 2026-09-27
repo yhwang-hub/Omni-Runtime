@@ -1,0 +1,26 @@
+package(default_visibility = ["//visibility:public"])
+
+cc_library(
+    name = "inference_config",
+    srcs = ["inference_config.cc"],
+    hdrs = ["inference_config.h"],
+    copts = ["-std=c++20"],
+    deps = [
+        "//Omni-Runtime/inference/common/inference_define:inference_define",
+        "//Omni-Runtime/utils:utils",
+    ],
+)
+
+cc_test(
+    name = "inference_config_test",
+    srcs = ["inference_config_test.cc"],
+    data = [
+        "//Omni-Runtime/inference/conf:qwen3_vl_8B_f16.conf",
+        "//Omni-Runtime/inference/conf:qwen3_vl_8B_f16.yaml",
+    ],
+    copts = ["-std=c++20"],
+    deps = [
+        ":inference_config",
+        "@googletest//:gtest_main",
+    ],
+)
