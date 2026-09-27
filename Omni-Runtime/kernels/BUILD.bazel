@@ -1,0 +1,54 @@
+package(default_visibility = ["//visibility:public"])
+
+cc_library(
+    name = "kernel_test_utils",
+    srcs = ["kernel_test_utils.cc"],
+    hdrs = [
+        "kernel_test_utils.h",
+        "flash_attention_test_utils.h",
+    ],
+    includes = [".."],
+    copts = ["-std=c++20"],
+    deps = [
+        ":kernels",
+        "//Omni-Runtime/kernel:kernel",
+        "//Omni-Runtime/memory:memory",
+        "@googletest//:gtest",
+    ],
+)
+
+cc_test(
+    name = "kernels_tests",
+    srcs = glob(["**/*_test.cc"]),
+    copts = ["-std=c++20"],
+    data = glob([
+        "**/*.cuh",
+        "*/*.h",
+    ]),
+    deps = [
+        ":kernels",
+        ":kernel_test_utils",
+        "@googletest//:gtest_main",
+        "@local_cuda//:cuda_runtime",
+    ],
+)
+
+filegroup(
+    name = "kernel_sources",
+    srcs = glob([
+        "**/*.cuh",
+        "*/*.h",
+    ]),
+)
+
+cc_library(
+    name = "kernels",
+    hdrs = [
+        "kernel_define.h",
+        "kernel_runtime.h",
+    ] + glob(["*/*.h"]),
+    data = glob(["**/*.cuh", "*/*.h"]),
+    includes = [".."],
+    copts = ["-std=c++20"],
+    deps = ["//Omni-Runtime/kernel:kernel"],
+)

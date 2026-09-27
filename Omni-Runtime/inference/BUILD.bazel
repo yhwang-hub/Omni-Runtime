@@ -1,0 +1,46 @@
+package(default_visibility = ["//visibility:public"])
+
+cc_library(
+    name = "inference",
+    srcs = [
+        "inference_graph/inference_graph.cc",
+        "sampling/sampler.cc",
+        "tokenizer/byte_pair_tokenizer.cc",
+        "tokenizer/chat_template.cc",
+        "tokenizer/gguf_tokenizer_loader.cc",
+        "tokenizer/tokenizer.cc",
+        "tokenizer/tokenizer_factory.cc",
+        "tokenizer/unigram_tokenizer.cc",
+        "tokenizer/word_piece_tokenizer.cc",
+    ],
+    hdrs = [
+        "inference_graph/inference_graph.h",
+        "sampling/sampler.h",
+        "tokenizer/byte_pair_tokenizer.h",
+        "tokenizer/chat_template.h",
+        "tokenizer/gguf_tokenizer_loader.h",
+        "tokenizer/tokenizer.h",
+        "tokenizer/tokenizer_define.h",
+        "tokenizer/tokenizer_factory.h",
+        "tokenizer/unigram_tokenizer.h",
+        "tokenizer/word_piece_tokenizer.h",
+    ],
+    copts = ["-std=c++20"],
+    deps = [
+        "//Omni-Runtime/gguf_serializer:gguf_serializer",
+        "//Omni-Runtime/graph:graph",
+        "//Omni-Runtime/inference/common/inference_define:inference_define",
+        "//Omni-Runtime/utils:utils",
+    ],
+)
+
+cc_test(
+    name = "tokenizer_tests",
+    srcs = ["tokenizer/tokenizer_test.cc"],
+    copts = ["-std=c++20"],
+    deps = [
+        ":inference",
+        "@googletest//:gtest_main",
+    ],
+    data = ["//model/qwen3_vl:models"],
+)

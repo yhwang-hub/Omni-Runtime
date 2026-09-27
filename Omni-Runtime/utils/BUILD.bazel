@@ -1,0 +1,18 @@
+package(default_visibility = ["//visibility:public"])
+
+cc_library(
+    name = "utils",
+    srcs = ["thread_pool.cc"],
+    hdrs = glob(["*.h"]),
+    copts = ["-std=c++17"],
+    linkopts = ["-lpthread"],
+)
+
+cc_test(
+    name = "utils_test",
+    srcs = ["utils_test.cc"],
+    deps = [
+        ":utils",
+        "@googletest//:gtest_main",
+    ],
+)

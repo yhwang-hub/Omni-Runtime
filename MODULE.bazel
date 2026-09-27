@@ -1,0 +1,12 @@
+module(name = "omni_runtime", version = "0.1.0")
+
+bazel_dep(name = "googletest", version = "1.15.2")
+bazel_dep(name = "rules_cuda", version = "0.2.5")
+local_path_override(
+    module_name = "googletest",
+    path = "/home/wangyh/workspace/TensorRT-Edge-LLM/3rdParty/googletest",
+)
+
+cuda = use_extension("@rules_cuda//cuda:extensions.bzl", "toolchain")
+cuda.local_toolchain(name = "local_cuda", toolkit_path = "")
+use_repo(cuda, "local_cuda")
