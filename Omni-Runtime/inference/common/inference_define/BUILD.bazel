@@ -1,0 +1,21 @@
+package(default_visibility = ["//visibility:public"])
+
+cc_library(
+    name = "inference_define",
+    srcs = [
+        "inference_define.cc",
+        "inference_define_impl.cc",
+    ],
+    hdrs = ["inference_define.h"],
+    copts = ["-std=c++20"],
+)
+
+cc_test(
+    name = "inference_define_test",
+    srcs = ["inference_define_test.cc"],
+    copts = ["-std=c++20"],
+    deps = [
+        ":inference_define",
+        "@googletest//:gtest_main",
+    ],
+)
